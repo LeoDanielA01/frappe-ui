@@ -1,43 +1,14 @@
-import { InjectionKey } from 'vue'
-import type { ResizableContext } from './types'
+import { InjectionKey, type ComputedRef } from 'vue'
+import type { ResizableContext, ResizableProviderContext } from './types'
 
 export const RESIZABLE_CONTEXT_KEY: InjectionKey<ResizableContext> = Symbol('resizable-context')
+export const RESIZABLE_PROVIDER_KEY: InjectionKey<ComputedRef<ResizableProviderContext>> =
+    Symbol('resizable-provider')
 
 export function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max)
 }
 
-export function getStorageKey(key: string): string {
-    return `resizable-${key}`
-}
-
-export function loadSizesFromStorage(key: string): number[] | null {
-    if (typeof window === 'undefined') return null
-
-    try {
-        const stored = localStorage.getItem(getStorageKey(key))
-        if (stored) {
-            const parsed = JSON.parse(stored)
-            if (Array.isArray(parsed) && parsed.every(n => typeof n === 'number')) {
-                return parsed
-            }
-        }
-    } catch (e) {
-        console.warn('Failed to load resizable sizes from storage:', e)
-    }
-
-    return null
-}
-
-export function saveSizesToStorage(key: string, sizes: number[]): void {
-    if (typeof window === 'undefined') return
-
-    try {
-        localStorage.setItem(getStorageKey(key), JSON.stringify(sizes))
-    } catch (e) {
-        console.warn('Failed to save resizable sizes to storage:', e)
-    }
-}
 
 export function distributeSizes(
     totalSize: number,
@@ -47,13 +18,11 @@ export function distributeSizes(
     const sizes: number[] = []
     let remaining = 100
 
-    // First pass: assign default or current sizes
     for (let i = 0; i < panels.length; i++) {
         const panel = panels[i]
         let size = currentSizes?.[i] ?? panel.defaultSize ?? 0
 
         if (size === 0 && panels.length > 0) {
-            // Auto-distribute if no size specified
             size = 100 / panels.length
         }
 
@@ -62,7 +31,6 @@ export function distributeSizes(
         remaining -= size
     }
 
-    // Second pass: distribute remaining space to grow panels
     if (remaining !== 0) {
         const growPanels = panels
             .map((p, i) => ({ ...p, index: i }))
@@ -82,7 +50,6 @@ export function distributeSizes(
         }
     }
 
-    // Normalize to ensure total is 100%
     const total = sizes.reduce((sum, size) => sum + size, 0)
     if (total !== 100 && total > 0) {
         return sizes.map(size => (size / total) * 100)
@@ -90,6 +57,8 @@ export function distributeSizes(
 
     return sizes
 }
+
+
 
 export function adjustSizes(
     sizes: number[],
@@ -106,35 +75,96 @@ export function adjustSizes(
     const leftPanel = panels[index]
     const rightPanel = panels[index + 1]
 
-    let leftSize = newSizes[index] + delta
-    let rightSize = newSizes[index + 1] - delta
+    const initialLeft = newSizes[index]
+    const initialRight = newSizes[index + 1]
+    const totalSize = initialLeft + initialRight
 
-    // Handle collapsing
-    if (leftPanel.collapsible && leftSize < leftPanel.minSize) {
-        leftSize = leftPanel.collapsedSize
-        rightSize = newSizes[index] + newSizes[index + 1] - leftSize
+    let targetLeft = initialLeft + delta
+
+    let useLeftCollapsed = false
+    if (leftPanel.collapsible) {
+        if (initialLeft <= leftPanel.collapsedSize) {
+            if (targetLeft > leftPanel.collapsedSize) {
+                if (targetLeft < leftPanel.minSize) {
+                    if (delta > 0) {
+                        useLeftCollapsed = false
+                        const threshold = leftPanel.collapsedSize + (leftPanel.minSize - leftPanel.collapsedSize) * 0.05
+                        if (targetLeft > threshold) {
+                        } else {
+                            useLeftCollapsed = true
+                        }
+                    } else {
+                        useLeftCollapsed = true
+                    }
+                }
+            } else {
+                useLeftCollapsed = true
+            }
+        } else {
+            if (targetLeft < leftPanel.minSize) {
+                useLeftCollapsed = true
+            }
+        }
     }
 
-    if (rightPanel.collapsible && rightSize < rightPanel.minSize) {
-        rightSize = rightPanel.collapsedSize
-        leftSize = newSizes[index] + newSizes[index + 1] - rightSize
+    let useRightCollapsed = false
+    if (rightPanel.collapsible) {
+        const currentRight = totalSize - initialLeft
+        const targetRight = totalSize - targetLeft
+
+        if (currentRight <= rightPanel.collapsedSize) {
+            if (targetRight > rightPanel.collapsedSize) {
+                if (targetRight < rightPanel.minSize) {
+                    if (delta < 0) {
+                        useRightCollapsed = false
+                        const threshold = rightPanel.collapsedSize + (rightPanel.minSize - rightPanel.collapsedSize) * 0.05
+                        if (targetRight <= threshold) {
+                            useRightCollapsed = true
+                        }
+                    } else {
+                        useRightCollapsed = true
+                    }
+                }
+            } else {
+                useRightCollapsed = true
+            }
+        } else {
+            if (totalSize - targetLeft < rightPanel.minSize) {
+                useRightCollapsed = true
+            }
+        }
     }
 
-    // Apply constraints
-    leftSize = clamp(leftSize, leftPanel.minSize, leftPanel.maxSize)
-    rightSize = clamp(rightSize, rightPanel.minSize, rightPanel.maxSize)
+    let finalLeft = targetLeft
 
-    // Ensure total size is preserved
-    const totalChange = (leftSize - newSizes[index]) + (rightSize - newSizes[index + 1])
-    if (Math.abs(totalChange) > 0.01) {
-        // Adjust to maintain total
-        const adjustment = totalChange / 2
-        leftSize -= adjustment
-        rightSize -= adjustment
+    const minLeft = leftPanel.minSize
+    const maxLeft = leftPanel.maxSize
+    const minLeftFromRight = totalSize - rightPanel.maxSize
+    const maxLeftFromRight = totalSize - rightPanel.minSize
+
+    const constraintMin = Math.max(minLeft, minLeftFromRight)
+    const constraintMax = Math.min(maxLeft, maxLeftFromRight)
+
+    if (useLeftCollapsed) {
+        finalLeft = leftPanel.collapsedSize
+    } else if (useRightCollapsed) {
+        const finalRight = rightPanel.collapsedSize
+        finalLeft = totalSize - finalRight
+    } else {
+        let effectiveMin = constraintMin
+        let effectiveMax = constraintMax
+
+        if (leftPanel.collapsible && initialLeft <= leftPanel.collapsedSize && delta > 0) {
+        }
+
+        if (rightPanel.collapsible && (totalSize - initialLeft) <= rightPanel.collapsedSize && delta < 0) {
+        }
+
+        finalLeft = clamp(targetLeft, effectiveMin, effectiveMax)
     }
 
-    newSizes[index] = leftSize
-    newSizes[index + 1] = rightSize
+    newSizes[index] = finalLeft
+    newSizes[index + 1] = totalSize - finalLeft
 
     return newSizes
 }

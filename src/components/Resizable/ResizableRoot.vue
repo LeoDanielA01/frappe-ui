@@ -3,6 +3,7 @@
     :is="as"
     ref="rootRef"
     :class="rootClasses"
+    v-bind="$attrs"
     :data-direction="direction"
     :data-disabled="disabled"
   >
@@ -13,7 +14,7 @@
 <script lang="ts" setup>
 import { computed, provide, ref, watch, onMounted, reactive } from 'vue'
 import type { ResizableRootProps, ResizableRootEmits, PanelData, ResizableContext } from './types'
-import { RESIZABLE_CONTEXT_KEY, loadSizesFromStorage, saveSizesToStorage, adjustSizes } from './utils'
+import { RESIZABLE_CONTEXT_KEY, adjustSizes, distributeSizes } from './utils'
 
 defineOptions({ inheritAttrs: false })
 
@@ -45,6 +46,9 @@ const rootClasses = computed(() => [
   }
 ])
 
+
+
+
 // Initialize sizes
 const initializeSizes = () => {
   const panelArray = Array.from(panels.values()).sort((a, b) => a.order - b.order)
@@ -52,30 +56,34 @@ const initializeSizes = () => {
   if (panelArray.length === 0) return
   
   let initialSizes: number[] | undefined
+  let source = 'auto'
   
-  // Priority: modelValue > storage > defaultValue > auto-distribute
-  if (props.modelValue && props.modelValue.length === panelArray.length) {
+  // Try modelValue first
+
+  // If no storage, try modelValue
+  if (!initialSizes && props.modelValue && props.modelValue.length === panelArray.length) {
     initialSizes = props.modelValue
-  } else if (props.storageKey) {
-    const stored = loadSizesFromStorage(props.storageKey)
-    if (stored && stored.length === panelArray.length) {
-      initialSizes = stored
-    } else if (props.defaultValue && props.defaultValue.length === panelArray.length) {
-      initialSizes = props.defaultValue
-    }
-  } else if (props.defaultValue && props.defaultValue.length === panelArray.length) {
+    source = 'model'
+  }
+  
+  // If no modelValue, try defaultValue
+  if (!initialSizes && props.defaultValue && props.defaultValue.length === panelArray.length) {
     initialSizes = props.defaultValue
+    source = 'default'
   }
   
   if (!initialSizes) {
     // Auto-distribute
-    const equalSize = 100 / panelArray.length
-    initialSizes = panelArray.map(() => equalSize)
+    initialSizes = distributeSizes(100, panelArray)
+    source = 'distribute'
   }
   
   // Apply constraints
   panelSizes.value = initialSizes.map((size, i) => {
     const panel = panelArray[i]
+    if (panel.collapsible && size < panel.minSize) {
+      return size
+    }
     return Math.max(panel.minSize, Math.min(panel.maxSize, size))
   })
   
@@ -83,6 +91,14 @@ const initializeSizes = () => {
   const total = panelSizes.value.reduce((sum, size) => sum + size, 0)
   if (total > 0 && Math.abs(total - 100) > 0.01) {
     panelSizes.value = panelSizes.value.map(size => (size / total) * 100)
+  }
+
+  // If we restored from storage or defaults but have a modelValue binding,
+  // we need to sync the parent to our resolved state.
+  if (source !== 'model' && props.modelValue !== undefined) {
+      if (panelArray.length === props.modelValue.length) {
+          emit('update:modelValue', panelSizes.value)
+      }
   }
 }
 
@@ -156,10 +172,7 @@ const endResize = () => {
   isResizing.value = false
   emit('resizeEnd', { sizes: panelSizes.value })
   
-  // Save to storage
-  if (props.storageKey) {
-    saveSizesToStorage(props.storageKey, panelSizes.value)
-  }
+
   
   activeHandleIndex.value = -1
 }
@@ -183,8 +196,14 @@ provide(RESIZABLE_CONTEXT_KEY, {
 
 // Watch for controlled mode changes
 watch(() => props.modelValue, (newValue) => {
-  if (newValue && newValue.length === panels.size) {
-    panelSizes.value = newValue
+  // Only update if the new value is significantly different to avoid loops
+  // and only if we have panels
+  if (newValue && newValue.length === panels.size && panels.size > 0) {
+     // Check if values are actually different to avoid overwriting internal state unnecessarily
+     const isDifferent = newValue.some((v, i) => Math.abs(v - panelSizes.value[i]) > 0.01)
+     if (isDifferent) {
+         panelSizes.value = newValue
+     }
   }
 }, { deep: true })
 
@@ -194,7 +213,8 @@ watch(() => panels.size, () => {
 })
 
 onMounted(() => {
-  initializeSizes()
+  // Logic moved to initializeSizes which is called by registerPanel
+  // but we can ensure it runs one final time if needed, though usually watcher handles it.
 })
 
 defineExpose({ rootRef, panelSizes })

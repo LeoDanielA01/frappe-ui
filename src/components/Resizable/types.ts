@@ -1,3 +1,5 @@
+import type { Slots } from 'vue'
+
 export type ResizableDirection = 'horizontal' | 'vertical'
 
 export interface ResizableRootProps {
@@ -5,12 +7,12 @@ export interface ResizableRootProps {
     direction?: ResizableDirection
     /** Render element or component */
     as?: string
+    /** Unique identifier (used as fallback for storage persistence) */
+    id?: string
     /** Controlled panel sizes (%) */
     modelValue?: number[]
     /** Initial sizes for uncontrolled mode (%) */
     defaultValue?: number[]
-    /** Persist sizes to localStorage */
-    storageKey?: string
     /** Sync sizes across multiple roots */
     syncId?: string
     /** Disable all resizing */
@@ -26,11 +28,14 @@ export interface ResizableRootEmits {
     (e: 'resizeStart', payload: { index: number }): void
     (e: 'resize', payload: { sizes: number[] }): void
     (e: 'resizeEnd', payload: { sizes: number[] }): void
+    (e: 'reorder', payload: { fromIndex: number; toIndex: number; panels: ResizablePanelConfig[] }): void
 }
 
 export interface ResizablePanelProps {
     /** Stable panel identity */
     id?: string
+    /** Optional label for custom container slots */
+    label?: string
     /** Render element or component */
     as?: string
     /** Minimum size in percentage */
@@ -71,6 +76,16 @@ export interface ResizableHandleProps {
     ariaLabel?: string
     /** Arrow key resize step in percentage */
     keyboardStep?: number
+    /** Show visual handle grip */
+    withHandle?: boolean
+    /** Enable drag-to-reorder panels */
+    draggable?: boolean
+    /** Callback when drag starts */
+    onDragStart?: (index: number) => void
+}
+
+export interface ResizablePanelConfig extends ResizablePanelProps {
+    order?: number
 }
 
 export interface PanelData {
@@ -84,6 +99,7 @@ export interface PanelData {
     grow: boolean
     resizable: boolean
     element?: HTMLElement
+    defaultSize?: number
 }
 
 export interface ResizableContext {
@@ -100,4 +116,18 @@ export interface ResizableContext {
     resize: (delta: number) => void
     endResize: () => void
     isResizing: boolean
+}
+
+export interface ResizableProviderContext {
+    panels: ResizablePanelConfig[]
+    hasPanels: boolean
+    rootProps: ResizableRootProps
+    slots: Slots
+    attrs: Record<string, unknown>
+    listeners: {
+        'update:modelValue': (sizes: number[]) => void
+        resizeStart: (payload: { index: number }) => void
+        resize: (payload: { sizes: number[] }) => void
+        resizeEnd: (payload: { sizes: number[] }) => void
+    }
 }

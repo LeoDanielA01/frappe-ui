@@ -4,25 +4,34 @@
     ref="handleRef"
     :class="handleClasses"
     :style="handleStyle"
+    v-bind="$attrs"
     :data-disabled="isDisabled"
     :aria-label="ariaLabel || `Resize handle ${index}`"
     :aria-orientation="context.direction === 'horizontal' ? 'vertical' : 'horizontal'"
     role="separator"
     tabindex="0"
-    @mousedown="handleMouseDown"
-    @touchstart="handleTouchStart"
     @keydown="handleKeyDown"
   >
     <slot>
-      <div :class="handleBarClasses" />
+      <div 
+        :class="handleBarClasses"
+        @mousedown.stop.prevent="handleMouseDown"
+        @touchstart.stop.prevent="handleTouchStart"
+      >
+        <div v-if="withHandle" class="z-10 flex h-4 w-3 items-center justify-center rounded-sm border bg-gray-50 group-hover:bg-gray-100">
+           <svg v-if="context.direction === 'vertical'" width="12" height="12" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-2.5 w-2.5"><path d="M5.5 4.625C5.5 5.10825 5.10825 5.5 4.625 5.5C4.14175 5.5 3.75 5.10825 3.75 4.625C3.75 4.14175 4.14175 3.75 4.625 3.75C5.10825 3.75 5.5 4.14175 5.5 4.625ZM9.5 4.625C9.5 5.10825 9.10825 5.5 8.625 5.5C8.14175 5.5 7.75 5.10825 7.75 4.625C7.75 4.14175 8.14175 3.75 8.625 3.75C9.10825 3.75 9.5 4.14175 9.5 4.625ZM10.375 11.25C10.8582 11.25 11.25 10.8582 11.25 10.375C11.25 9.89175 10.8582 9.5 10.375 9.5C9.89175 9.5 9.5 9.89175 9.5 10.375C9.5 10.8582 9.89175 11.25 10.375 11.25ZM6.375 11.25C6.85825 11.25 7.25 10.8582 7.25 10.375C7.25 9.89175 6.85825 9.5 6.375 9.5C5.89175 9.5 5.5 9.89175 5.5 10.375C5.5 10.8582 5.89175 11.25 6.375 11.25Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+           <svg v-else width="12" height="12" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-2.5 w-2.5"><path d="M5.5 4.625C5.5 5.10825 5.10825 5.5 4.625 5.5C4.14175 5.5 3.75 5.10825 3.75 4.625C3.75 4.14175 4.14175 3.75 4.625 3.75C5.10825 3.75 5.5 4.14175 5.5 4.625ZM9.5 4.625C9.5 5.10825 9.10825 5.5 8.625 5.5C8.14175 5.5 7.75 5.10825 7.75 4.625C7.75 4.14175 8.14175 3.75 8.625 3.75C9.10825 3.75 9.5 4.14175 9.5 4.625ZM10.375 11.25C10.8582 11.25 11.25 10.8582 11.25 10.375C11.25 9.89175 10.8582 9.5 10.375 9.5C9.89175 9.5 9.5 9.89175 9.5 10.375C9.5 10.8582 9.89175 11.25 10.375 11.25ZM6.375 11.25C6.85825 11.25 7.25 10.8582 7.25 10.375C7.25 9.89175 6.85825 9.5 6.375 9.5C5.89175 9.5 5.5 9.89175 5.5 10.375C5.5 10.8582 5.89175 11.25 6.375 11.25Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" transform="rotate(90 7.5 7.5)"></path></svg>
+        </div>
+      </div>
     </slot>
   </component>
 </template>
 
 <script lang="ts" setup>
-import { computed, inject, ref, onMounted, onUnmounted } from 'vue'
+import { computed, inject, ref, onUnmounted } from 'vue'
 import type { ResizableHandleProps } from './types'
 import { RESIZABLE_CONTEXT_KEY } from './utils'
+
 
 defineOptions({ inheritAttrs: false })
 
@@ -33,6 +42,7 @@ const props = withDefaults(defineProps<ResizableHandleProps>(), {
   cursor: undefined,
   ariaLabel: undefined,
   keyboardStep: 5,
+  withHandle: false,
 })
 
 const context = inject(RESIZABLE_CONTEXT_KEY)
@@ -223,52 +233,105 @@ defineExpose({ handleRef, isDragging })
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  z-index: 10;
+  z-index: 100; /* Increased z-index */
   outline: none;
+  background-color: transparent;
+  overflow: visible;
+  touch-action: none;
 }
 
+/* Negative margin trick: Element has 1px size (for event capture) but takes 0px layout space */
 .resizable-handle.horizontal {
-  width: 12px;
+  width: 1px;
+  margin-right: -1px;
   height: 100%;
-  margin: 0 -6px;
-  padding: 0 6px;
+  cursor: col-resize;
+  border: none;
+  background-color: transparent;
 }
 
 .resizable-handle.vertical {
   width: 100%;
-  height: 12px;
-  margin: -6px 0;
-  padding: 6px 0;
+  height: 1px;
+  margin-bottom: -1px;
+  cursor: row-resize;
+  border: none;
+  background-color: transparent;
+}
+
+/* HIT AREA */
+.resizable-handle-bar {
+  position: absolute;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  background-color: transparent;
+  touch-action: none;
+}
+
+.resizable-handle-bar.horizontal {
+  top: 0;
+  bottom: 0;
+  left: -5px; /* Center 1px handle in 11px area (-5 to +5 is 10, +1px width = 11) */
+  width: 11px;
+  cursor: col-resize;
+}
+
+.resizable-handle-bar.vertical {
+  left: 0;
+  right: 0;
+  top: -5px;
+  height: 11px;
+  cursor: row-resize;
+}
+
+/* VISUAL INDICATOR */
+.resizable-handle-bar::after {
+  content: '';
+  position: absolute;
+  background-color: transparent;
+  transition: background-color 0.15s ease;
+  pointer-events: none;
+}
+
+.resizable-handle-bar.horizontal::after {
+  width: 1px;
+  height: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.resizable-handle-bar.vertical::after {
+  height: 1px;
+  width: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Hover & Drag States */
+.resizable-handle:hover .resizable-handle-bar::after {
+  background-color: #93c5fd;
+}
+
+.resizable-handle.dragging .resizable-handle-bar::after {
+  background-color: #60a5fa;
+}
+
+/* Specific hover on the bar itself to ensure consistency */
+.resizable-handle-bar:hover::after {
+  background-color: #93c5fd;
 }
 
 .resizable-handle.disabled {
   pointer-events: none;
   opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.resizable-handle:focus-visible {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
-}
-
-.resizable-handle-bar {
-  background-color: #e5e7eb;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-}
-
-.resizable-handle:hover .resizable-handle-bar,
-.resizable-handle.dragging .resizable-handle-bar {
+.resizable-handle:focus-visible .resizable-handle-bar::after {
   background-color: #3b82f6;
-}
-
-.resizable-handle-bar.horizontal {
-  width: 2px;
-  height: 40px;
-}
-
-.resizable-handle-bar.vertical {
-  width: 40px;
-  height: 2px;
+  transform: scale(1.5); 
 }
 </style>
