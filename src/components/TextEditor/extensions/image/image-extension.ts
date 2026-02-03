@@ -4,7 +4,7 @@ import {
   mergeAttributes,
 } from '@tiptap/core'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
-import ImageNodeView from './ImageNodeView.vue'
+import MediaNodeView from '../../components/MediaNodeView.vue'
 import { Plugin, Selection, Transaction, EditorState } from '@tiptap/pm/state'
 import { EditorView } from '@tiptap/pm/view'
 import { Node } from '@tiptap/pm/model'
@@ -50,11 +50,14 @@ declare module '@tiptap/core' {
        * Select an image file using the file picker and upload it
        */
       selectAndUploadImage: () => ReturnType
-
       /**
        * Set image alignment
        */
       setImageAlign: (align: 'left' | 'center' | 'right') => ReturnType
+      /**
+       * Set image float for text wrapping
+       */
+      setImageFloat: (float: 'left' | 'right' | null) => ReturnType
     }
   }
 }
@@ -67,7 +70,8 @@ const inputRegex = /(?:^|\s)(!\[(.+|:?)]\((\S+)(?:(?:\s+)["'](\S+)["'])?\))$/
 export const ImageExtension = NodeExtension.create<ImageExtensionOptions>({
   name: 'image',
 
-  group: 'block',
+  group: 'inline',
+  inline: true,
   draggable: true,
   selectable: true,
 
@@ -83,7 +87,7 @@ export const ImageExtension = NodeExtension.create<ImageExtensionOptions>({
         parseHTML: () => false,
       },
       align: {
-        default: 'left',
+        default: 'center',
         parseHTML: (element) => {
           const align = (
             element.getAttribute('data-align') ||
@@ -99,6 +103,18 @@ export const ImageExtension = NodeExtension.create<ImageExtensionOptions>({
         renderHTML: (attributes) => {
           return {
             'data-align': attributes.align || 'left',
+          }
+        },
+      },
+      float: {
+        default: null,
+        parseHTML: (element) => {
+          return element.getAttribute('data-float') || null
+        },
+        renderHTML: (attributes) => {
+          if (!attributes.float) return {}
+          return {
+            'data-float': attributes.float,
           }
         },
       },
@@ -140,7 +156,7 @@ export const ImageExtension = NodeExtension.create<ImageExtensionOptions>({
   },
 
   addNodeView() {
-    return VueNodeViewRenderer(ImageNodeView)
+    return VueNodeViewRenderer(MediaNodeView)
   },
 
   addOptions() {
@@ -156,6 +172,11 @@ export const ImageExtension = NodeExtension.create<ImageExtensionOptions>({
         (align: 'left' | 'center' | 'right') =>
         ({ commands }) => {
           return commands.updateAttributes(this.name, { align })
+        },
+      setImageFloat:
+        (float: 'left' | 'right' | null) =>
+        ({ commands }) => {
+          return commands.updateAttributes(this.name, { float })
         },
 
       setImage:

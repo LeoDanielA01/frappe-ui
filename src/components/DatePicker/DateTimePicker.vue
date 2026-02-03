@@ -127,7 +127,7 @@
                 :disabled="dateObj.disabled"
                 @click="
                   !dateObj.disabled &&
-                    handleDateCellClick(dateObj.date, togglePopover)
+                  handleDateCellClick(dateObj.date, togglePopover)
                 "
               >
                 {{ dateObj.date.date() }}
@@ -231,7 +231,7 @@ import FeatherIcon from '../FeatherIcon.vue'
 import TimePicker from '../TimePicker/TimePicker.vue'
 import { dayjs, dayjsLocal, dayjsSystem } from '../../utils/dayjs'
 import { months, monthStart, generateWeeks, getDateValue } from './utils'
-import type { Dayjs } from 'dayjs/esm'
+import type { Dayjs } from 'dayjs'
 import type {
   DatePickerProps,
   DatePickerEmits,
@@ -268,7 +268,7 @@ const view = ref<ViewMode>('date')
 const currentYear = ref<number>(dayjs().year())
 const currentMonth = ref<number>(dayjs().month())
 const DATE_FORMAT = 'YYYY-MM-DD'
-const DATE_TIME_FORMAT = 'YYYY-MM-DD h:mm a'
+const DATE_TIME_FORMAT = 'YYYY-MM-DD HH:mm:ss'
 
 const selectedDate = ref<string>('') // YYYY-MM-DD
 const timeValue = ref<string>('') // HH:mm:ss

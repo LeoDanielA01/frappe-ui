@@ -36,13 +36,24 @@ const props = withDefaults(defineProps<ComboboxProps>(), {
   variant: 'subtle',
   options: () => [],
 })
-const emit = defineEmits([
-  'update:modelValue',
-  'update:selectedOption',
-  'focus',
-  'blur',
-  'input',
-])
+
+const emit = defineEmits<{
+  /** Emitted when the selected value changes (v-model binding) */
+  'update:modelValue': (value: string | null) => void
+
+  /** Emitted when the selected option object changes */
+  'update:selectedOption': (option: SimpleOption | null) => void
+
+  /** Emitted when the input receives focus */
+  focus: (event: FocusEvent) => void
+
+  /** Emitted when the input loses focus */
+  blur: (event: FocusEvent) => void
+
+  /** Emitted when the user types in the input */
+  input: (value: string) => void
+}>()
+
 
 const searchTerm = ref(getDisplayValue(props.modelValue))
 const internalModelValue = ref(props.modelValue)
@@ -152,14 +163,14 @@ function getDisplayValue(selectedValue: string | null | undefined): string {
   const options = props.options.flatMap((opt) =>
     isGroup(opt) ? opt.options : opt,
   )
-  const selectedOption = options.find((opt) => getValue(opt) === selectedValue)
+  const selectedOption = options.find((opt) => getKey(opt) === selectedValue)
   return selectedOption ? getLabel(selectedOption) : selectedValue || ''
 }
 
 const selectedOption = computed(() => {
   if (!internalModelValue.value) return null
   return allOptionsFlat.value.find(
-    (opt) => getValue(opt) === internalModelValue.value,
+    (opt) => getKey(opt) === internalModelValue.value,
   )
 })
 
@@ -294,6 +305,15 @@ const variantClasses = computed(() => {
 defineExpose({
   reset,
 })
+
+defineSlots<{
+  /** Custom content rendered before the input (left side) */
+  prefix?: () => any
+
+  /** Custom slot for individual options, only used if the option has `slotName` */
+  [slotName: string]: (props: { option: SimpleOption; searchTerm: string }) => any
+}>()
+
 </script>
 
 <template>
