@@ -24,6 +24,7 @@
       <PopoverContent
         :side="placementSide"
         :align="placementAlign"
+        :sideOffset="offset"
         :style="{
           minWidth: matchTargetWidth
             ? 'var(--reka-popover-trigger-width)'
@@ -70,7 +71,7 @@ import {
   PopoverPortal,
   PopoverRoot,
 } from 'reka-ui'
-import { PopoverProps } from './types'
+import { PopoverProps, PopoverEmits } from './types'
 
 const props = withDefaults(defineProps<PopoverProps>(), {
   show: undefined,
@@ -103,12 +104,14 @@ const anchorRef = ref<HTMLElement | null>(null)
 
 const isOpen = computed({
   get: () => (isShowPropPassed.value ? props.show : _isOpen.value),
-  set: (value: boolean) => {
-    if (!isShowPropPassed.value) {
-      _isOpen.value = value
-    }
-    emit('update:show', value)
-  },
+	set: (value: boolean) => {
+		if (!isShowPropPassed.value) {
+			if (value !== _isOpen.value) {
+				_isOpen.value = value
+				onUpdateOpen(value)
+			}
+		}
+	},
 })
 
 const isShowPropPassed = computed(() => {
@@ -241,6 +244,36 @@ onUnmounted(() => {
     clearTimeout(leaveTimer.value)
   }
 })
+
+defineSlots<{
+  /** Content of the trigger/anchor element */
+  target?: (props: {
+    togglePopover: () => void
+    updatePosition: () => void
+    open: () => void
+    close: () => void
+    isOpen: boolean
+  }) => any
+
+  /** Main content of the popover body */
+  body?: (props: {
+    togglePopover: () => void
+    updatePosition: () => void
+    open: () => void
+    close: () => void
+    isOpen: boolean
+  }) => any
+
+  /** Inner content inside the default body container */
+  'body-main'?: (props: {
+    togglePopover: () => void
+    updatePosition: () => void
+    open: () => void
+    close: () => void
+    isOpen: boolean
+  }) => any
+}>()
+
 </script>
 
 <style>

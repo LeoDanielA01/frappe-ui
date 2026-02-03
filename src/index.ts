@@ -33,8 +33,8 @@ export * from './components/Rating'
 export * from './components/Resizable'
 export { default as Resource } from './components/Resource.vue'
 export * from './components/Select'
+export * from './components/Slider'
 export * from './components/Password'
-export * from './components/Spinner'
 export * from './components/Switch'
 export * from './components/TabButtons'
 export { default as Tabs } from './components/Tabs/Tabs.vue'
@@ -83,6 +83,7 @@ export { default as ECharts } from './components/Charts/ECharts.vue'
 // directives
 export { default as onOutsideClickDirective } from './directives/onOutsideClick'
 export { default as visibilityDirective } from './directives/visibility'
+export { default as focusDirective } from './directives/focus'
 
 // utilities
 export { default as call, createCall } from './utils/call.js'
