@@ -32,6 +32,23 @@
           </span>
           <slot name="suffix" :item="item" />
         </router-link>
+        <a
+          v-else-if="item.href"
+          :href="item.href"
+          @click="item.onClick ? item.onClick() : null"
+          class="flex items-center rounded px-0.5 py-1 text-lg font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
+          :class="[
+            i == crumbs.length - 1
+              ? 'text-ink-gray-9'
+              : 'text-ink-gray-5 hover:text-ink-gray-7',
+          ]"
+        >
+          <slot name="prefix" :item="item" />
+          <span>
+            {{ item.label }}
+          </span>
+          <slot name="suffix" :item="item" />
+        </a>
         <button
           v-else
           @click="item.onClick ? item.onClick() : null"
@@ -68,6 +85,7 @@ import type { BreadcrumbsProps } from './types'
 import { ref, computed, nextTick, useTemplateRef } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 import LucideEllipsis from '~icons/lucide/ellipsis'
+import type { BreadcrumbItem } from './types'
 
 const crumbsEl = useTemplateRef<HTMLDivElement>('crumbsRef')
 
@@ -116,4 +134,12 @@ const dropdownItems = computed(() => {
 })
 
 const crumbs = computed(() => items.value.slice(overflowedX.value ? -2 : 0))
+
+defineSlots<{
+  /** Content shown before each breadcrumb label */
+  prefix?: (props: { item: BreadcrumbItem }) => any
+
+  /** Content shown after each breadcrumb label */
+  suffix?: (props: { item: BreadcrumbItem }) => any
+}>()
 </script>

@@ -16,12 +16,20 @@ const model = defineModel<string | number>({ default: 0 })
 const indicatorXCss = `left-0 bottom-0 h-[2px] w-[--reka-tabs-indicator-size] transition-[width,transform]
                           translate-x-[--reka-tabs-indicator-position] translate-y-[1px]`
 
-const indicatorYCss = `right-0 top-0 w-[2px] h-[--reka-tabs-indicator-size]
+const indicatorYCss = `end-0 top-0 w-[2px] h-[--reka-tabs-indicator-size]
                        translate-y-[--reka-tabs-indicator-position] transition-[height,transform]`
 
 // Using a plain <button> element via `h('button')` to avoid picking up
 // the globally registered Button component and its styles.
 const Btn = h('button')
+
+defineSlots<{
+  /** Custom renderer for a tab trigger (icon + label / router-link). */
+  'tab-item'?: (props: { tab: { label: string; icon?: string; route?: string } }) => any
+
+  /** Content rendered for each tab panel. */
+  'tab-panel'?: (props: { tab: { label: string; icon?: string; route?: string } }) => any
+}>()
 </script>
 
 <template>
@@ -33,7 +41,7 @@ const Btn = h('button')
     v-model="model"
   >
     <TabsList
-      class="relative min-h-fit flex data-[orientation=vertical]:flex-col p-1 border-b data-[orientation=vertical]:border-r gap-5"
+      class="relative min-h-fit flex data-[orientation=vertical]:flex-col p-1 border-b data-[orientation=vertical]:border-e gap-5"
       :class="{
         'overflow-x-auto overflow-y-hidden px-5': !props.vertical,
         'py-3': props.vertical,
